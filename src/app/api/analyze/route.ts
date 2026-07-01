@@ -29,6 +29,7 @@ export async function POST(req: Request) {
         keyword: ctx.keyword,
         category: ctx.category,
         candidates: ctx.candidates,
+        segments: ctx.segments,
       });
       external = externalPayloadToSteps(payload);
       usedAi = true;

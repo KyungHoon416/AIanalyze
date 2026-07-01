@@ -139,7 +139,7 @@ export default function PipelineDemo() {
       {loading && (
         <div className="flex items-center gap-2 text-white/50 text-xs sm:text-sm mb-4">
           <span className="pulse-dot inline-block h-2 w-2 rounded-full bg-violet-400" />
-          AI 파이프라인 실행 중...
+          시장조사 → 경쟁사 분석 → 브랜드 분석 → 광고주 추천 → 제안서 생성을 순차 실행 중입니다 (최대 40초 소요)
         </div>
       )}
 
