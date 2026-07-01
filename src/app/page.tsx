@@ -1,7 +1,6 @@
 import PipelineDemo from "@/components/PipelineDemo";
 import WorkflowDiagram from "@/components/WorkflowDiagram";
 import CategoryBrowser from "@/components/CategoryBrowser";
-import TopRecommendations from "@/components/TopRecommendations";
 
 const AI_SCOPE = [
   { icon: "🎯", title: "AI 광고주 추천" },
@@ -109,23 +108,13 @@ export default function Home() {
       </section>
 
       {/* Advertiser categories */}
-      <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20 border-b border-white/10">
+      <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
         <SectionHeading
           eyebrow="ADVERTISER DATABASE"
           title="광고주 후보 카테고리"
           desc="18개 업종, 200여 개 브랜드의 광고주 후보 데이터베이스를 기반으로 AI가 추천을 수행합니다."
         />
         <CategoryBrowser />
-      </section>
-
-      {/* Top 30 */}
-      <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <SectionHeading
-          eyebrow="AI RECOMMENDATION"
-          title="AI 추천 우선순위"
-          desc="자사 트래픽·세그먼트와의 정합성을 기준으로 산출된 우선 컨택 대상입니다."
-        />
-        <TopRecommendations />
       </section>
 
       <footer className="border-t border-white/10 py-10 text-center text-xs text-white/30">

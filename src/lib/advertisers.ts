@@ -270,12 +270,6 @@ export const TOP_RECOMMENDATIONS: string[] = [
   "토스",
 ];
 
-export const EXCLUDED_ADVERTISERS = ["야놀자", "여기어때"];
-
-export function findCategoryForAdvertiser(name: string): AdvertiserCategory | undefined {
-  return CATEGORIES.find((c) => c.advertisers.includes(name));
-}
-
 export function findAdvertisersByKeyword(keyword: string): { advertiser: string; category: AdvertiserCategory }[] {
   const q = keyword.trim().toLowerCase();
   if (!q) return [];
