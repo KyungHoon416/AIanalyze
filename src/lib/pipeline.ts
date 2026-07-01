@@ -1,5 +1,5 @@
 import { CATEGORIES, TOP_RECOMMENDATIONS, findAdvertisersByKeyword } from "./advertisers";
-import { AD_SLOTS, formatPrice, formatRate, type AdSlot } from "./adSlots";
+import { AD_SLOTS, formatPrice, formatRate, monthlyListPrice, monthlyPromoPrice, type AdSlot } from "./adSlots";
 import type { ExternalAiPayload } from "./gemini";
 
 // 키워드 문자열을 시드로 사용하는 결정론적 PRNG (mulberry32).
@@ -80,19 +80,17 @@ export type PipelineContext = {
   competitorCount: number;
   brandScore: number;
   impressions: number;
-  ctr: string;
-  cvr: string;
+  conversionRate: string;
+  conversions: number;
+  revenue: number;
   roas: string;
   segments: string[];
   selectedSlots: AdSlot[];
   upsellSlot: AdSlot | null;
   monthlySpend: number;
+  monthlyListSpend: number;
   avgOrderValue: number;
 };
-
-function monthlyPrice(slot: AdSlot): number {
-  return slot.priceUnit === "주" ? Math.round(slot.price * 4.345) : slot.price;
-}
 
 // 키워드로부터 파이프라인 전 단계에서 공유할 결정론적 컨텍스트(매칭 광고주, 목업 지표 등)를 생성한다.
 export function buildPipelineContext(keyword: string): PipelineContext {
@@ -119,18 +117,21 @@ export function buildPipelineContext(keyword: string): PipelineContext {
   const slotPool = brandScore >= 80 ? AD_SLOTS : AD_SLOTS.filter((s) => s.id !== "splash");
   const selectedSlots = pick(rng, slotPool, 3);
   const remainingSlots = AD_SLOTS.filter((s) => !selectedSlots.some((sel) => sel.id === s.id));
-  const upsellSlot = remainingSlots.sort((a, b) => monthlyPrice(b) - monthlyPrice(a))[0] ?? null;
+  const upsellSlot = remainingSlots.sort((a, b) => monthlyPromoPrice(b) - monthlyPromoPrice(a))[0] ?? null;
 
-  const monthlySpend = selectedSlots.reduce((sum, s) => sum + monthlyPrice(s), 0);
-  const avgOrderValue = 20000 + Math.floor(rng() * 60000);
+  const monthlySpend = selectedSlots.reduce((sum, s) => sum + monthlyPromoPrice(s), 0);
+  const monthlyListSpend = selectedSlots.reduce((sum, s) => sum + monthlyListPrice(s), 0);
+  const avgOrderValue = 15000 + Math.floor(rng() * 35000);
 
-  const avgCtrMid = selectedSlots.reduce((sum, s) => sum + (s.ctrMin + s.ctrMax) / 2, 0) / selectedSlots.length;
-  const avgCvrMid = selectedSlots.reduce((sum, s) => sum + (s.cvrMin + s.cvrMax) / 2, 0) / selectedSlots.length;
-  const ctr = (avgCtrMid * (0.85 + rng() * 0.3)).toFixed(2);
-  const cvr = (avgCvrMid * (0.85 + rng() * 0.3)).toFixed(2);
+  const avgConversionMid =
+    selectedSlots.reduce((sum, s) => sum + (s.conversionMin + s.conversionMax) / 2, 0) / selectedSlots.length;
+  const conversionRate = (avgConversionMid * (0.85 + rng() * 0.3)).toFixed(2);
 
   const impressions = 50000 + Math.floor(rng() * 400000);
-  const conversions = impressions * (Number(ctr) / 100) * (Number(cvr) / 100);
+  // "전환율"(conversionRate)은 노출 대비 클릭/참여 반응률이며, 이 중 실제 구매로 이어지는 비중(체크아웃 완료율)은
+  // 별도로 적용해야 매출/ROAS가 현실적인 범위로 계산된다.
+  const checkoutRate = 0.02 + rng() * 0.04;
+  const conversions = impressions * (Number(conversionRate) / 100) * checkoutRate;
   const revenue = conversions * avgOrderValue;
   const roas = monthlySpend > 0 ? ((revenue / monthlySpend) * 100).toFixed(0) : "0";
 
@@ -145,13 +146,15 @@ export function buildPipelineContext(keyword: string): PipelineContext {
     competitorCount: 3 + Math.floor(rng() * 6),
     brandScore,
     impressions,
-    ctr,
-    cvr,
+    conversionRate,
+    conversions: Math.round(conversions),
+    revenue: Math.round(revenue),
     roas,
     segments: pick(rng, SEGMENT_PERSONAS, 2),
     selectedSlots,
     upsellSlot,
     monthlySpend,
+    monthlyListSpend,
     avgOrderValue,
   };
 }
@@ -255,7 +258,11 @@ export function generateFinalSteps(ctx: PipelineContext): PipelineStepResult[] {
       engine: "final",
       title: "AI 광고 상품 추천",
       lines: ctx.selectedSlots.map(
-        (s) => `${s.name} (${s.location}) — ${formatPrice(s)}, 예상 CTR ${formatRate(s.ctrMin, s.ctrMax)}`
+        (s) =>
+          `${s.name} (${s.location}) — 프로모션가 ${formatPrice(monthlyPromoPrice(s), "월")}, 전환율 ${formatRate(
+            s.conversionMin,
+            s.conversionMax
+          )}`
       ),
       tags: ctx.selectedSlots.map((s) => s.name),
     },
@@ -265,7 +272,10 @@ export function generateFinalSteps(ctx: PipelineContext): PipelineStepResult[] {
       title: "광고 운영",
       lines: [
         `${ctx.selectedSlots.map((s) => s.name).join(" + ")} 구좌 조합으로 캠페인 집행`,
-        `총 노출 ${ctx.impressions.toLocaleString()}회 시뮬레이션, 월 광고비 약 ${ctx.monthlySpend.toLocaleString()}원`,
+        `총 노출 ${ctx.impressions.toLocaleString()}회 시뮬레이션, 월 광고비 약 ${ctx.monthlySpend.toLocaleString()}원 (정가 대비 ${(
+          (1 - ctx.monthlySpend / ctx.monthlyListSpend) *
+          100
+        ).toFixed(0)}% 할인)`,
       ],
     },
     {
@@ -273,8 +283,8 @@ export function generateFinalSteps(ctx: PipelineContext): PipelineStepResult[] {
       engine: "final",
       title: "광고 효과 분석",
       lines: [
-        `CTR ${ctx.ctr}%, CVR ${ctx.cvr}%`,
-        `벤치마크 대비 ${Number(ctx.ctr) > 8 ? "상회" : "유사"} 수준`,
+        `평균 전환율 ${ctx.conversionRate}%`,
+        `벤치마크 대비 ${Number(ctx.conversionRate) > 10 ? "상회" : "유사"} 수준`,
       ],
     },
     {
@@ -293,7 +303,10 @@ export function generateFinalSteps(ctx: PipelineContext): PipelineStepResult[] {
       lines: [
         `현재 성과 기준 재계약 추천도: ${Number(ctx.roas) >= 200 ? "높음" : "중간"}`,
         ctx.upsellSlot
-          ? `업셀링 제안: ${ctx.upsellSlot.name} 구좌(${formatPrice(ctx.upsellSlot)}) 추가 시 예상 ROAS 추가 상승`
+          ? `업셀링 제안: ${ctx.upsellSlot.name} 구좌(${formatPrice(
+              monthlyPromoPrice(ctx.upsellSlot),
+              "월"
+            )}) 추가 시 예상 ROAS 추가 상승`
           : "업셀링 제안: 현재 전 구좌 집행 중, 예산 증액을 통한 노출 확대 검토",
       ],
     },

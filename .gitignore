@@ -27,3 +27,6 @@ next-env.d.ts
 
 # claude local settings
 .claude/settings.local.json
+
+# raw proposal deck source images (used copies live in public/proposal)
+/image
