@@ -5,7 +5,7 @@ import { runPipeline, type PipelineStepResult } from "@/lib/pipeline";
 
 const ENGINE_LABEL: Record<PipelineStepResult["engine"], string> = {
   internal: "내부 데이터",
-  "external-ai": "외부 AI (GPT/Gemini)",
+  "external-ai": "외부 AI (Gemini)",
   final: "AI 업무 자동화",
 };
 
@@ -21,29 +21,53 @@ export default function PipelineDemo() {
   const [keyword, setKeyword] = useState("");
   const [steps, setSteps] = useState<PipelineStepResult[]>([]);
   const [visibleCount, setVisibleCount] = useState(0);
-  const [running, setRunning] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [usedAi, setUsedAi] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const start = (kw: string) => {
-    const target = kw.trim();
-    if (!target || running) return;
-    if (timerRef.current) clearInterval(timerRef.current);
-
-    const result = runPipeline(target);
+  const reveal = (result: PipelineStepResult[]) => {
     setSteps(result);
     setVisibleCount(0);
-    setRunning(true);
-
+    setRevealing(true);
+    if (timerRef.current) clearInterval(timerRef.current);
     let i = 0;
     timerRef.current = setInterval(() => {
       i += 1;
       setVisibleCount(i);
       if (i >= result.length) {
         if (timerRef.current) clearInterval(timerRef.current);
-        setRunning(false);
+        setRevealing(false);
       }
     }, 550);
   };
+
+  const start = async (kw: string) => {
+    const target = kw.trim();
+    if (!target || loading || revealing) return;
+
+    setLoading(true);
+    setUsedAi(false);
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword: target }),
+      });
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const data = await res.json();
+      setUsedAi(Boolean(data.usedAi));
+      reveal(data.steps as PipelineStepResult[]);
+    } catch {
+      // API 호출 실패 시 클라이언트 목업으로 대체
+      setUsedAi(false);
+      reveal(runPipeline(target));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const running = loading || revealing;
 
   return (
     <div className="w-full">
@@ -65,7 +89,7 @@ export default function PipelineDemo() {
           disabled={running}
           className="rounded-xl bg-gradient-to-r from-violet-500 to-cyan-400 px-6 py-3 text-sm sm:text-base font-semibold text-black disabled:opacity-50 transition"
         >
-          {running ? "AI 분석 진행 중..." : "AI 분석 시작"}
+          {loading ? "AI 분석 요청 중..." : revealing ? "AI 분석 진행 중..." : "AI 분석 시작"}
         </button>
       </form>
 
@@ -84,6 +108,13 @@ export default function PipelineDemo() {
           </button>
         ))}
       </div>
+
+      {loading && (
+        <div className="flex items-center gap-2 text-white/50 text-xs sm:text-sm mb-4">
+          <span className="pulse-dot inline-block h-2 w-2 rounded-full bg-violet-400" />
+          AI 파이프라인 실행 중...
+        </div>
+      )}
 
       {steps.length > 0 && (
         <div className="space-y-3">
@@ -110,7 +141,7 @@ export default function PipelineDemo() {
               </ul>
             </div>
           ))}
-          {running && (
+          {revealing && (
             <div className="flex items-center gap-2 text-white/40 text-xs sm:text-sm pl-1">
               <span className="pulse-dot inline-block h-2 w-2 rounded-full bg-cyan-400" />
               다음 단계 분석 중...
@@ -118,8 +149,10 @@ export default function PipelineDemo() {
           )}
           {!running && visibleCount === steps.length && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300">
-              분석 완료 — 담당자 확인 없이 AI가 전 과정을 자동 처리했습니다. (본 화면은 목업 데모이며 실제 결과는 API
-              연동 후 반영됩니다)
+              분석 완료 — 담당자 확인 없이 AI가 전 과정을 자동 처리했습니다.{" "}
+              {usedAi
+                ? "(외부 AI 분석 단계는 Gemini API 실시간 응답입니다)"
+                : "(Gemini API 키가 설정되지 않아 목업 데이터로 표시 중입니다)"}
             </div>
           )}
         </div>
