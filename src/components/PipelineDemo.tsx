@@ -24,6 +24,7 @@ export default function PipelineDemo() {
   const [loading, setLoading] = useState(false);
   const [revealing, setRevealing] = useState(false);
   const [usedAi, setUsedAi] = useState(false);
+  const [downloadingPpt, setDownloadingPpt] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const reveal = (result: PipelineStepResult[]) => {
@@ -64,6 +65,32 @@ export default function PipelineDemo() {
       reveal(runPipeline(target));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadProposal = async () => {
+    if (downloadingPpt || !keyword.trim()) return;
+    setDownloadingPpt(true);
+    try {
+      const res = await fetch("/api/proposal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword: keyword.trim() }),
+      });
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${keyword.trim()}_광고제안서.pptx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("제안서 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setDownloadingPpt(false);
     }
   };
 
@@ -139,6 +166,15 @@ export default function PipelineDemo() {
                   <li key={i}>{line}</li>
                 ))}
               </ul>
+              {step.id === "proposal" && (
+                <button
+                  onClick={downloadProposal}
+                  disabled={downloadingPpt}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-400 px-4 py-2 text-xs sm:text-sm font-semibold text-black disabled:opacity-50 transition"
+                >
+                  {downloadingPpt ? "제안서 생성 중... (AI 이미지 포함, 최대 30초 소요)" : "📊 광고 제안서 PPT 다운로드"}
+                </button>
+              )}
             </div>
           ))}
           {revealing && (
