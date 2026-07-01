@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { runPipeline, type PipelineStepResult } from "@/lib/pipeline";
+import { EXAMPLE_KEYWORD, EXAMPLE_STEPS } from "@/lib/exampleAnalysis";
 
 const ENGINE_LABEL: Record<PipelineStepResult["engine"], string> = {
   internal: "내부 데이터",
@@ -18,12 +19,13 @@ const ENGINE_COLOR: Record<PipelineStepResult["engine"], string> = {
 const EXAMPLES = ["에버랜드", "스타벅스", "무신사", "쿠팡", "겨울 캠핑"];
 
 export default function PipelineDemo() {
-  const [keyword, setKeyword] = useState("");
-  const [steps, setSteps] = useState<PipelineStepResult[]>([]);
-  const [visibleCount, setVisibleCount] = useState(0);
+  const [keyword, setKeyword] = useState(EXAMPLE_KEYWORD);
+  const [steps, setSteps] = useState<PipelineStepResult[]>(EXAMPLE_STEPS);
+  const [visibleCount, setVisibleCount] = useState(EXAMPLE_STEPS.length);
   const [loading, setLoading] = useState(false);
   const [revealing, setRevealing] = useState(false);
-  const [usedAi, setUsedAi] = useState(false);
+  const [usedAi, setUsedAi] = useState(true);
+  const [isExample, setIsExample] = useState(true);
   const [downloadingPpt, setDownloadingPpt] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -49,6 +51,7 @@ export default function PipelineDemo() {
 
     setLoading(true);
     setUsedAi(false);
+    setIsExample(false);
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -120,6 +123,12 @@ export default function PipelineDemo() {
         </button>
       </form>
 
+      {isExample && (
+        <div className="mb-4 rounded-lg border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-xs sm:text-sm text-violet-200">
+          👇 &quot;{EXAMPLE_KEYWORD}&quot; 키워드로 실제 실행한 예시 결과입니다. 다른 키워드를 입력해 직접 분석해보세요.
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 mb-8 text-xs sm:text-sm">
         <span className="text-white/40 py-1">예시 키워드:</span>
         {EXAMPLES.map((ex) => (
@@ -139,7 +148,7 @@ export default function PipelineDemo() {
       {loading && (
         <div className="flex items-center gap-2 text-white/50 text-xs sm:text-sm mb-4">
           <span className="pulse-dot inline-block h-2 w-2 rounded-full bg-violet-400" />
-          시장조사 → 경쟁사 분석 → 브랜드 분석 → 광고주 추천 → 제안서 생성을 순차 실행 중입니다 (최대 40초 소요)
+          시장조사 → 경쟁사 분석 → 브랜드 분석 → 광고주 추천 → 제안서 생성을 순차 실행 중입니다 (최대 1~2분 소요)
         </div>
       )}
 
@@ -172,7 +181,7 @@ export default function PipelineDemo() {
                   disabled={downloadingPpt}
                   className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-400 px-4 py-2 text-xs sm:text-sm font-semibold text-black disabled:opacity-50 transition"
                 >
-                  {downloadingPpt ? "제안서 생성 중... (AI 이미지 포함, 최대 30초 소요)" : "📊 광고 제안서 PPT 다운로드"}
+                  {downloadingPpt ? "제안서 생성 중..." : "📊 광고 제안서 PPT 다운로드"}
                 </button>
               )}
             </div>

@@ -64,7 +64,10 @@ function toStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
-const PERSONA = `당신은 여가·이커머스 플랫폼 "놀이의발견"의 AI 광고 영업 애널리스트입니다.`;
+const PERSONA = `당신은 웅진컴퍼스 플랫폼사업기획팀 소속 Senior Platform Strategist이자 Marketing & Growth Lead입니다.
+랠리즈(Rallies), 놀발(놀이의발견), 클래스박스(ClassBox), 클래스몰(ClassMall), 리딩오션스 플러스(Reading Oceans Plus) 등
+다양한 플랫폼의 사업 전략, 광고 상품 기획, 광고 영업, 데이터 분석 및 플랫폼 성장을 담당하고 있습니다.
+당신의 분석은 구체적인 수치, 근거, 실행 가능한 인사이트를 포함해 실무자가 바로 의사결정에 쓸 수 있을 만큼 깊이 있어야 합니다.`;
 
 // --- 1단계: AI 시장조사 (첫 프롬프트, 이전 단계 없음) ---
 async function analyzeMarket(keyword: string, category: string, segments: string[]): Promise<string[]> {
@@ -75,7 +78,8 @@ async function analyzeMarket(keyword: string, category: string, segments: string
 연관 카테고리: ${category}
 타겟 세그먼트: ${segments.join(" / ")}
 
-JSON 스키마: { "lines": string[] } — 시장 규모, 성장률, 트렌드를 담은 한국어 문장 2~4개.`;
+시장 규모(가능하면 구체적 수치·단위 추정 포함), 최근 성장률과 그 배경, 세부 트렌드 3가지 이상, 타겟 세그먼트별 소비 행태를 폭넓게 다루세요.
+JSON 스키마: { "lines": string[] } — 근거와 수치를 담은 한국어 문장 6~9개. 각 문장은 구체적이고 실무적으로(추상적 미사여구 지양) 작성하세요.`;
   const parsed = (await callGeminiJson(prompt)) as { lines?: unknown };
   return toStringArray(parsed.lines);
 }
@@ -90,7 +94,8 @@ async function analyzeCompetitors(keyword: string, category: string, marketLines
 시장조사 결과:
 ${marketLines.map((l) => `- ${l}`).join("\n")}
 
-JSON 스키마: { "lines": string[] } — 위 시장조사 결과를 반영한 경쟁 강도, 주요 경쟁사 특징을 담은 한국어 문장 2~4개.`;
+실존하는 주요 경쟁 브랜드를 구체적으로 3곳 이상 거명하고, 각 경쟁사의 강점/약점, 가격·프로모션 전략, 자사(놀이의발견) 대비 차별화 포인트를 근거 기반으로 분석하세요.
+JSON 스키마: { "lines": string[] } — 위 시장조사 결과를 반영한 한국어 문장 6~9개.`;
   const parsed = (await callGeminiJson(prompt)) as { lines?: unknown };
   return toStringArray(parsed.lines);
 }
@@ -103,7 +108,7 @@ async function analyzeBrand(
   competitorLines: string[]
 ): Promise<string[]> {
   const prompt = `${PERSONA}
-아래는 앞서 수행한 시장조사와 경쟁사 분석 결과입니다. 이를 근거로 "${keyword}"가 놀이의발견 플랫폼과 얼마나 잘 맞는지 브랜드 적합도를 분석하세요. 반드시 JSON으로만 답하세요.
+아래는 앞서 수행한 시장조사와 경쟁사 분석 결과입니다. 이를 근거로 "${keyword}"가 놀이의발견 플랫폼과 얼마나 잘 맞는지 브랜드 적합도를 심층 분석하세요. 반드시 JSON으로만 답하세요.
 
 키워드: "${keyword}"
 연관 카테고리: ${category}
@@ -112,7 +117,8 @@ ${marketLines.map((l) => `- ${l}`).join("\n")}
 경쟁사 분석 결과:
 ${competitorLines.map((l) => `- ${l}`).join("\n")}
 
-JSON 스키마: { "lines": string[] } — 브랜드 적합도, 자사 플랫폼 이용자층과의 정합성을 담은 한국어 문장 2~3개.`;
+브랜드 적합도 점수(정성적 근거 포함), 자사 회원 데이터와의 정합성, 잠재 리스크 요인, 협업 시 기대 시너지를 구체적으로 다루세요.
+JSON 스키마: { "lines": string[] } — 한국어 문장 5~7개.`;
   const parsed = (await callGeminiJson(prompt)) as { lines?: unknown };
   return toStringArray(parsed.lines);
 }
@@ -136,7 +142,8 @@ ${marketLines.map((l) => `- ${l}`).join("\n")}
 ${competitorLines.map((l) => `- ${l}`).join("\n")}
 광고주 후보 목록 (이 중에서만 선택): ${candidates.join(", ")}
 
-JSON 스키마: { "lines": string[], "recommended": string[] } — lines는 추천 근거 설명 2~4개, recommended는 후보 목록 중에서 고른 광고주 이름 3~5개.`;
+추천 광고주별로 왜 지금 이 키워드/시장 상황에 적합한지 구체적 근거를 각각 제시하세요.
+JSON 스키마: { "lines": string[], "recommended": string[] } — lines는 추천 근거 설명 5~8개(가능하면 광고주별로 1개 이상), recommended는 후보 목록 중에서 고른 광고주 이름 3~5개.`;
   const parsed = (await callGeminiJson(prompt)) as { lines?: unknown; recommended?: unknown };
   const recommended = toStringArray(parsed.recommended).filter((name) => candidates.includes(name));
   return { lines: toStringArray(parsed.lines), recommended };
@@ -162,7 +169,8 @@ ${competitorLines.map((l) => `- ${l}`).join("\n")}
 브랜드 분석 결과:
 ${brandLines.map((l) => `- ${l}`).join("\n")}
 
-JSON 스키마: { "lines": string[] } — 제안 컨셉, 기대 효과를 담은 한국어 문장 2~4개.`;
+제안 컨셉, 추천 캠페인 방향(시즌/테마), 기대 효과(정성+정량), 실행 시 유의사항을 포함해 구체적으로 작성하세요.
+JSON 스키마: { "lines": string[] } — 한국어 문장 5~7개.`;
   const parsed = (await callGeminiJson(prompt)) as { lines?: unknown };
   return toStringArray(parsed.lines);
 }

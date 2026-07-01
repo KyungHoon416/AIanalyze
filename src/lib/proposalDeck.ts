@@ -3,6 +3,7 @@ import path from "node:path";
 import PptxGenJS from "pptxgenjs";
 import type { PipelineContext } from "./pipeline";
 import { formatPrice, formatRate, monthlyListPrice, monthlyPromoPrice } from "./adSlots";
+import { fixPptxContentTypes } from "./pptxFix";
 
 const COLOR = {
   dark: "0B0D14",
@@ -32,9 +33,13 @@ function readImageDataUri(relPath: string): string {
   return `image/jpeg;base64,${buffer.toString("base64")}`;
 }
 
+// slide.background에 서로 다른 이미지를 여러 장 연속으로 지정하면 pptxgenjs(4.0.1)가
+// 슬라이드마다 별도의 slideMaster를 선언해버리면서 실제로는 그 파일들을 쓰지 않는
+// 손상된 패키지를 생성하는 버그가 있다 (Content_Types.xml에 없는 파트가 참조됨).
+// background 대신 전체 슬라이드를 덮는 일반 이미지 오브젝트로 추가해 이를 피한다.
 function addFullBleedImageSlide(pptx: PptxGenJS, relPath: string) {
   const slide = pptx.addSlide();
-  slide.background = { data: readImageDataUri(relPath) };
+  slide.addImage({ data: readImageDataUri(relPath), x: 0, y: 0, w: "100%", h: "100%" });
 }
 
 function addStatCards(slide: PptxGenJS.Slide, stats: [string, string][], y: number) {
@@ -236,6 +241,6 @@ export async function buildProposalPptx(ctx: PipelineContext, advertiserName: st
   // 11. 감사합니다 (고정 클로징 슬라이드, 실제 연락처 포함)
   addFullBleedImageSlide(pptx, CLOSING_SLIDE_IMAGE);
 
-  const buffer = await pptx.write({ outputType: "nodebuffer" });
-  return buffer as Buffer;
+  const buffer = (await pptx.write({ outputType: "nodebuffer" })) as Buffer;
+  return fixPptxContentTypes(buffer);
 }
